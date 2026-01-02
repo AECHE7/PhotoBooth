@@ -9,7 +9,7 @@ export interface StickerInstance {
     scale: number;
 }
 
-export const drawStickers = (ctx: CanvasRenderingContext2D, stickers: StickerInstance[], width: number, height: number) => {
+export const drawStickers = (ctx: CanvasRenderingContext2D, stickers: StickerInstance[]) => {
     stickers.forEach(sticker => {
         ctx.save();
         ctx.font = `${50 * sticker.scale}px serif`;

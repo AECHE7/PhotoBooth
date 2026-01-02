@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { usePhotoBooth } from '../hooks/usePhotoBooth';
 import { Camera } from '../components/Camera';
 import { Countdown } from '../components/Countdown';

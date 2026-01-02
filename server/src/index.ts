@@ -13,6 +13,8 @@ const port = 3000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); // Support JSON payloads, increase limit for images
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Serve static frontend files
+app.use(express.static(path.join(__dirname, '../../dist')));
 
 // Configure Multer for Base64 or standard uploads.
 // Since we are sending base64 strings from the client (canvas.toDataURL),
@@ -65,6 +67,11 @@ app.get('/api/photos', async (req, res) => {
     console.error('Fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch photos' });
   }
+});
+
+// Catch-all route for SPA
+app.get(/.*/, (req, res) => {
+    res.sendFile(path.join(__dirname, '../../dist/index.html'));
 });
 
 app.listen(port, '0.0.0.0', () => {

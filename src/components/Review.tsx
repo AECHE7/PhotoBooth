@@ -37,7 +37,7 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 ctx.drawImage(img, 0, 0);
-                drawStickers(ctx, activeStickers, canvas.width, canvas.height);
+                drawStickers(ctx, activeStickers);
                 result = canvas.toDataURL('image/png');
             }
         }
