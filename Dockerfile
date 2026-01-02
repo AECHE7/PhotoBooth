@@ -29,5 +29,9 @@ EXPOSE 3000
 # Change directory to server for startup
 WORKDIR /app/server
 
-# Start server
-CMD ["npm", "run", "start:prod"]
+# Set default DATABASE_URL for SQLite if not provided
+ENV DATABASE_URL="file:./dev.db"
+
+# Start server with migration
+# We use 'prisma migrate deploy' to ensure the DB schema exists
+CMD npx prisma migrate deploy && npm run start:prod
