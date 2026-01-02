@@ -1,6 +1,9 @@
 # Use Node 22 base image
 FROM node:22-slim
 
+# Install OpenSSL for Prisma
+RUN apt-get update -y && apt-get install -y openssl ca-certificates
+
 # Set working directory
 WORKDIR /app
 
