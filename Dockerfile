@@ -26,5 +26,8 @@ RUN cd server && npx prisma generate
 # Expose port 3000 (backend)
 EXPOSE 3000
 
+# Change directory to server for startup
+WORKDIR /app/server
+
 # Start server
 CMD ["npm", "run", "start:prod"]
