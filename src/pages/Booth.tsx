@@ -5,13 +5,16 @@ import { Countdown } from '../components/Countdown';
 import { Review } from '../components/Review';
 import { type FilterType, filters } from '../utils/filters';
 import { Link } from 'react-router-dom';
+import { PageTransition } from '../components/PageTransition';
+import { motion } from 'framer-motion';
 
 export function Booth() {
   const { status, countdown, photos, videoRef, startSession, resetSession } = usePhotoBooth();
   const [currentFilter, setCurrentFilter] = useState<FilterType>('normal');
 
   return (
-    <div className="flex-1 flex flex-col relative overflow-hidden">
+    <PageTransition>
+    <div className="flex-1 flex flex-col relative overflow-hidden h-full">
 
         {status === 'review' ? (
           <Review photos={photos} onRetake={resetSession} />
@@ -34,12 +37,14 @@ export function Booth() {
 
             {/* Controls */}
             {status === 'idle' && (
-              <div className="p-6 bg-black flex flex-col gap-4 items-center justify-center">
+              <div className="p-6 bg-black flex flex-col gap-4 items-center justify-center z-10">
                 {/* Filter Selector (Live Preview) */}
                 <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
                     <div className="flex gap-4 px-4 justify-center">
                         {(Object.keys(filters) as FilterType[]).map(f => (
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.95 }}
                                 key={f}
                                 onClick={() => setCurrentFilter(f)}
                                 className={`flex flex-col items-center gap-2 group`}
@@ -54,23 +59,31 @@ export function Booth() {
                                     />
                                 </div>
                                 <span className="text-xs text-gray-400 capitalize">{f}</span>
-                            </button>
+                            </motion.button>
                         ))}
                     </div>
                 </div>
 
                 <div className="flex items-center gap-8">
-                    <Link to="/gallery" className="text-white bg-gray-800 px-4 py-2 rounded-full font-medium hover:bg-gray-700 transition-colors">
-                        View Gallery
+                    <Link to="/gallery">
+                        <motion.div
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="text-white bg-gray-800 px-4 py-2 rounded-full font-medium hover:bg-gray-700 transition-colors"
+                        >
+                            View Gallery
+                        </motion.div>
                     </Link>
 
-                    <button
+                    <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
                     onClick={startSession}
-                    className="w-20 h-20 rounded-full bg-white border-4 border-gray-300 shadow-lg active:scale-95 transition-transform flex items-center justify-center"
+                    className="w-20 h-20 rounded-full bg-white border-4 border-gray-300 shadow-lg flex items-center justify-center"
                     aria-label="Start Photo Booth"
                     >
                         <div className="w-16 h-16 rounded-full bg-red-600 border-2 border-white"></div>
-                    </button>
+                    </motion.button>
 
                     {/* Spacer for centering */}
                     <div className="w-[115px]"></div>
@@ -87,5 +100,6 @@ export function Booth() {
           </div>
         )}
     </div>
+    </PageTransition>
   );
 }

@@ -1,6 +1,20 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Booth } from './pages/Booth';
 import { Gallery } from './pages/Gallery';
+import { AnimatePresence } from 'framer-motion';
+
+function AnimatedRoutes() {
+    const location = useLocation();
+
+    return (
+        <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
+                <Route path="/" element={<Booth />} />
+                <Route path="/gallery" element={<Gallery />} />
+            </Routes>
+        </AnimatePresence>
+    );
+}
 
 function App() {
   return (
@@ -13,10 +27,7 @@ function App() {
 
         {/* Main Content */}
         <main className="flex-1 flex flex-col relative h-screen">
-          <Routes>
-            <Route path="/" element={<Booth />} />
-            <Route path="/gallery" element={<Gallery />} />
-          </Routes>
+            <AnimatedRoutes />
         </main>
       </div>
     </BrowserRouter>
