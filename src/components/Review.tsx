@@ -12,6 +12,7 @@ interface ReviewProps {
 export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
   const [selectedLayout, setSelectedLayout] = useState<LayoutType>('strip');
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('normal');
+  const [frameColor, setFrameColor] = useState<string>('#ffffff');
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -24,7 +25,7 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
     const processImage = async () => {
       setIsProcessing(true);
       try {
-        let result = await stitchImages(photos, selectedLayout, selectedFilter);
+        let result = await stitchImages(photos, selectedLayout, selectedFilter, frameColor);
 
         // Apply stickers if any
         if (activeStickers.length > 0) {
@@ -52,7 +53,7 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
     };
 
     processImage();
-  }, [photos, selectedLayout, selectedFilter, activeStickers]);
+  }, [photos, selectedLayout, selectedFilter, activeStickers, frameColor]);
 
   const addSticker = (emoji: string) => {
       // Add random position near center
@@ -140,20 +141,33 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
         {/* Layout Selection */}
         <div>
           <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-2">Layout</h3>
-          <div className="flex gap-2">
-            {(['strip', 'grid'] as LayoutType[]).map((layout) => (
-              <button
-                key={layout}
-                onClick={() => setSelectedLayout(layout)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  selectedLayout === layout
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                }`}
-              >
-                {layout === 'strip' ? 'Strip' : '2x2 Grid'}
-              </button>
-            ))}
+          <div className="flex gap-4 flex-wrap">
+            <div className="flex gap-2">
+                {(['strip', 'grid'] as LayoutType[]).map((layout) => (
+                <button
+                    key={layout}
+                    onClick={() => setSelectedLayout(layout)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    selectedLayout === layout
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                    }`}
+                >
+                    {layout === 'strip' ? 'Strip' : '2x2 Grid'}
+                </button>
+                ))}
+            </div>
+
+            {/* Frame Color Picker */}
+            <div className="flex items-center gap-2 bg-gray-800 p-1 rounded-lg">
+                <span className="text-xs text-gray-400 pl-2">Frame:</span>
+                <input
+                    type="color"
+                    value={frameColor} // This state needs to be added back!
+                    onChange={(e) => setFrameColor(e.target.value)} // This setter needs to be added back!
+                    className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
+                />
+            </div>
           </div>
         </div>
 

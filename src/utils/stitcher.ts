@@ -5,7 +5,8 @@ export type LayoutType = 'strip' | 'grid';
 export const stitchImages = async (
   images: string[],
   layout: LayoutType,
-  filter: FilterType
+  filter: FilterType,
+  frameColor: string = '#ffffff'
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (images.length === 0) {
@@ -48,7 +49,7 @@ export const stitchImages = async (
         canvas.height = (height * imgs.length) + (padding * (imgs.length + 1)) + headerHeight + footerHeight;
 
         // Background
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = frameColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         applyFilterToContext(ctx, filter);
@@ -65,7 +66,7 @@ export const stitchImages = async (
         canvas.height = (height * 2) + (padding * 3) + headerHeight + footerHeight;
 
         // Background
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = frameColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         applyFilterToContext(ctx, filter);
