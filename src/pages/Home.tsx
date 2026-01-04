@@ -38,6 +38,10 @@ export const Home = () => {
                 </button>
               </Link>
             </div>
+
+            <div className="mt-8 text-sm">
+                <p className="text-gray-400">Want a private gallery? <Link to="/login" className="text-blue-400 hover:underline">Login</Link> or <Link to="/register" className="text-blue-400 hover:underline">Register</Link></p>
+            </div>
           </div>
         </div>
 
