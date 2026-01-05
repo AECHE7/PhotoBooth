@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { sounds } from '../utils/sound';
 
 export type PhotoBoothStatus = 'idle' | 'countdown' | 'capturing' | 'review';
 
@@ -27,6 +28,9 @@ export const usePhotoBooth = ({
     const timer = setInterval(() => {
       currentCount -= 1;
       setCountdown(currentCount);
+      if (currentCount > 0) {
+        sounds.playCountdown();
+      }
       if (currentCount === 0) {
         clearInterval(timer);
         setStatus('capturing');
@@ -47,6 +51,7 @@ export const usePhotoBooth = ({
 
         const photo = takePhoto();
         if (photo) {
+            sounds.playShutter();
             newPhotos.push(photo);
             setPhotos(prev => [...prev, photo]);
         }

@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { type FilterType, filters } from '../utils/filters';
 import { type LayoutType, stitchImages } from '../utils/stitcher';
 import { QRCodeSVG } from 'qrcode.react';
+import Draggable from 'react-draggable';
 import { stickers, type StickerInstance, drawStickers, loadStickerImages } from '../utils/stickers';
 import { applyCartoonFilter } from '../utils/aiFilters';
+import { sounds } from '../utils/sound';
 
 interface ReviewProps {
   photos: string[];
@@ -16,6 +18,14 @@ const AI_STYLES = [
   { id: 'oil-painting', name: 'Oil Painting' },
   { id: 'retro', name: 'Retro' },
   { id: 'pixar', name: '3D Character' },
+];
+
+const FRAME_PRESETS = [
+    { name: 'White', value: '#ffffff' },
+    { name: 'Black', value: '#000000' },
+    { name: 'Pink', value: '#ffb7b2' },
+    { name: 'Neon', value: '#ccff00' },
+    { name: 'Blue', value: '#a6e3e9' },
 ];
 
 export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
@@ -35,15 +45,17 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
   // Decoration State
   const [activeStickers, setActiveStickers] = useState<StickerInstance[]>([]);
 
-  // 1. Base Processing (Stitch + Filters + Client-side Cartoon + Stickers)
+  // 1. Base Processing (Stitch + Filters + Client-side Cartoon)
+  // NOTE: Stickers are now overlayed in the DOM for interaction,
+  // and only burned in during final save/download!
   useEffect(() => {
     const processImage = async () => {
       setIsProcessing(true);
       try {
         let result = await stitchImages(photos, selectedLayout, selectedFilter, frameColor);
 
-        // Apply effects (Cartoon + Stickers)
-        if (activeStickers.length > 0 || isCartoon) {
+        // Apply effects (Cartoon only here, stickers are separate now until save)
+        if (isCartoon) {
             const canvas = document.createElement('canvas');
             const img = new Image();
             img.src = result;
@@ -53,22 +65,14 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 ctx.drawImage(img, 0, 0);
-
-                if (isCartoon) {
-                    applyCartoonFilter(ctx, canvas.width, canvas.height);
-                }
-
-                if (activeStickers.length > 0) {
-                    const imageMap = await loadStickerImages(activeStickers);
-                    drawStickers(ctx, activeStickers, imageMap);
-                }
-
+                applyCartoonFilter(ctx, canvas.width, canvas.height);
                 result = canvas.toDataURL('image/png');
             }
         }
 
         setBaseResultImage(result);
         setResultImage(result);
+        // Do NOT reset stickers here, they should persist across frame changes
         setSavedUrl(null);
       } catch (error) {
         console.error("Error stitching images:", error);
@@ -78,7 +82,7 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
     };
 
     processImage();
-  }, [photos, selectedLayout, selectedFilter, activeStickers, frameColor, isCartoon]);
+  }, [photos, selectedLayout, selectedFilter, frameColor, isCartoon]);
 
   const handleAiGenerate = async (style: string) => {
       if (!baseResultImage) return;
@@ -105,16 +109,25 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
   };
 
   const addSticker = (content: string, type: 'emoji' | 'image' = 'emoji') => {
+      sounds.playBeep(600, 0.05);
       // Add random position near center
       const newSticker: StickerInstance = {
           id: Date.now(),
           type,
           content,
-          x: 200 + Math.random() * 100,
-          y: 300 + Math.random() * 100,
+          x: 100 + Math.random() * 50, // Initial DOM position
+          y: 100 + Math.random() * 50,
           scale: type === 'image' ? 1.0 : 2.0
       };
       setActiveStickers([...activeStickers, newSticker]);
+  };
+
+  const updateStickerPosition = (id: number, x: number, y: number) => {
+      setActiveStickers(prev => prev.map(s => s.id === id ? { ...s, x, y } : s));
+  };
+
+  const removeSticker = (id: number) => {
+      setActiveStickers(prev => prev.filter(s => s.id !== id));
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,10 +146,97 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
       setActiveStickers([]);
   };
 
-  const handleDownload = () => {
-    if (resultImage) {
+  // Helper to burn stickers into the image for saving/downloading
+  const getFinalImageWithStickers = async () => {
+      if (!resultImage) return null;
+      if (activeStickers.length === 0) return resultImage;
+
+      const canvas = document.createElement('canvas');
+      const img = new Image();
+      img.src = resultImage;
+      await new Promise((resolve) => { img.onload = resolve; });
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+
+      ctx.drawImage(img, 0, 0);
+
+      // We need to map DOM coordinates to Canvas coordinates.
+      // The image is displayed with `object-contain` in a container.
+      // This is tricky because the DOM coordinates are relative to the draggable container,
+      // but the canvas is the full resolution image.
+
+      // Simplification for MVP:
+      // We assume the user placed stickers relative to the displayed image size.
+      // But obtaining the exact displayed size of the image is hard in React without refs.
+
+      // ALTERNATIVE APPROACH:
+      // Since `react-draggable` uses pixel values, we can try to use a fixed container size
+      // for the preview that matches the aspect ratio?
+
+      // BETTER APPROACH:
+      // Just burn them based on their relative position if we can normalize it?
+      // Or, let's keep it simple: Render the stickers onto the canvas based on a fixed coordinate system?
+      // No, `react-draggable` gives pixels.
+
+      // Let's rely on the `activeStickers` x/y which are updated via `onStop`.
+      // We need to know the scale factor between the DOM preview and the real image.
+
+      const previewImg = document.getElementById('preview-image') as HTMLImageElement;
+      if (previewImg) {
+          const rect = previewImg.getBoundingClientRect();
+          const scaleX = canvas.width / rect.width;
+          const scaleY = canvas.height / rect.height;
+
+          // Load sticker images
+          const imageMap = await loadStickerImages(activeStickers);
+
+          // Draw each sticker
+          activeStickers.forEach(sticker => {
+              // Adjust coordinates based on the preview image's position relative to the container?
+              // The draggable container should overlay the image exactly.
+
+              // If the Draggable container is the parent of the image, X/Y are relative to that.
+
+              const finalX = sticker.x * scaleX;
+              const finalY = sticker.y * scaleY;
+
+              // Draw
+              ctx.save();
+              ctx.translate(finalX, finalY);
+              // Scale sticker?
+              // The sticker in DOM has a font-size or width.
+              // Emoji font size usually ~24px or 2rem (32px).
+              // Image width usually 100px.
+              const domScale = sticker.scale; // internal scale logic
+
+              if (sticker.type === 'emoji') {
+                  // Emojis in DOM are roughly 30px?
+                  const fontSize = 40 * domScale * scaleX; // Approximation
+                  ctx.font = `${fontSize}px serif`;
+                  ctx.fillText(sticker.content, 0, fontSize); // Baseline correction
+              } else {
+                  const sImg = imageMap[sticker.content];
+                  if (sImg) {
+                      const w = 100 * domScale * scaleX;
+                      const h = (100 * (sImg.height / sImg.width)) * domScale * scaleY;
+                      ctx.drawImage(sImg, 0, 0, w, h);
+                  }
+              }
+              ctx.restore();
+          });
+      }
+
+      return canvas.toDataURL('image/png');
+  };
+
+  const handleDownload = async () => {
+    const finalImage = await getFinalImageWithStickers();
+    if (finalImage) {
       const link = document.createElement('a');
-      link.href = resultImage;
+      link.href = finalImage;
       link.download = `photo-booth-${Date.now()}.png`;
       document.body.appendChild(link);
       link.click();
@@ -145,7 +245,8 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
   };
 
   const handleSaveToGallery = async () => {
-    if (!resultImage) return;
+    const finalImage = await getFinalImageWithStickers();
+    if (!finalImage) return;
 
     setIsSaving(true);
     try {
@@ -154,7 +255,7 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ image: resultImage })
+            body: JSON.stringify({ image: finalImage })
         });
 
         if (response.ok) {
@@ -182,22 +283,70 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
         {isProcessing || !resultImage ? (
            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
         ) : (
-          <div className="flex flex-col items-center gap-4 relative">
-              {isGeneratingAi && (
-                  <div className="absolute inset-0 bg-black/50 z-10 flex items-center justify-center rounded-sm">
-                      <div className="flex flex-col items-center">
-                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mb-2"></div>
-                          <p className="text-white font-bold">Dreaming...</p>
-                      </div>
-                  </div>
-              )}
-              <img
-                src={resultImage}
-                alt="Result"
-                className="max-h-[50vh] max-w-full shadow-lg rounded-sm object-contain"
-              />
+          <div className="flex flex-col items-center gap-4 relative w-full h-full max-w-lg mx-auto">
+
+              {/* Image Container with Drag Area */}
+              <div className="relative inline-block w-full" style={{ touchAction: 'none' }}>
+                <img
+                    id="preview-image"
+                    src={resultImage}
+                    alt="Result"
+                    className="w-full h-auto shadow-lg rounded-sm block select-none pointer-events-none"
+                    style={{ maxHeight: '60vh', objectFit: 'contain' }}
+                />
+
+                {/* Loading Overlay */}
+                {isGeneratingAi && (
+                    <div className="absolute inset-0 bg-black/50 z-10 flex items-center justify-center rounded-sm">
+                        <div className="flex flex-col items-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mb-2"></div>
+                            <p className="text-white font-bold">Dreaming...</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Draggable Stickers Overlay */}
+                <div className="absolute inset-0 overflow-hidden">
+                    {activeStickers.map((sticker) => (
+                        <Draggable
+                            key={sticker.id}
+                            defaultPosition={{ x: sticker.x, y: sticker.y }}
+                            onStop={(_e, data) => updateStickerPosition(sticker.id, data.x, data.y)}
+                            bounds="parent"
+                        >
+                            <div className="absolute cursor-move hover:scale-110 transition-transform active:cursor-grabbing group">
+                                {sticker.type === 'emoji' ? (
+                                    <div style={{ fontSize: '2.5rem', lineHeight: 1, textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                                        {sticker.content}
+                                    </div>
+                                ) : (
+                                    <img
+                                        src={sticker.content}
+                                        alt="sticker"
+                                        className="w-24 h-auto drop-shadow-md"
+                                        draggable={false}
+                                    />
+                                )}
+                                {/* Delete Button */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation(); // Prevent drag start
+                                        // Use touchEnd for mobile? Draggable handles this mostly.
+                                        removeSticker(sticker.id);
+                                    }}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                    onTouchEnd={() => removeSticker(sticker.id)}
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </Draggable>
+                    ))}
+                </div>
+              </div>
+
               {savedUrl && (
-                  <div className="bg-white p-2 rounded-lg shadow-lg flex flex-col items-center">
+                  <div className="bg-white p-2 rounded-lg shadow-lg flex flex-col items-center animate-in fade-in zoom-in duration-300">
                       <QRCodeSVG value={savedUrl} size={128} />
                       <p className="text-black text-xs mt-1 font-bold">Scan to Download</p>
                   </div>
@@ -231,11 +380,22 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
             {/* Frame Color Picker */}
             <div className="flex items-center gap-2 bg-gray-800 p-1 rounded-lg">
                 <span className="text-xs text-gray-400 pl-2">Frame:</span>
+                {FRAME_PRESETS.map(preset => (
+                    <button
+                        key={preset.name}
+                        onClick={() => setFrameColor(preset.value)}
+                        className={`w-6 h-6 rounded-full border-2 ${frameColor === preset.value ? 'border-blue-500 scale-110' : 'border-transparent hover:scale-110'} transition-transform`}
+                        style={{ backgroundColor: preset.value }}
+                        title={preset.name}
+                    />
+                ))}
+                <div className="w-px h-6 bg-gray-600 mx-1"></div>
                 <input
                     type="color"
-                    value={frameColor} // This state needs to be added back!
-                    onChange={(e) => setFrameColor(e.target.value)} // This setter needs to be added back!
+                    value={frameColor}
+                    onChange={(e) => setFrameColor(e.target.value)}
                     className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
+                    title="Custom Color"
                 />
             </div>
           </div>
