@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authenticateToken, AuthRequest, requireAuth } from './auth';
+import aiRoutes from './routes/ai';
 
 dotenv.config();
 const SECRET_KEY = process.env.JWT_SECRET || 'secret-key-change-me';
@@ -36,6 +37,9 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use(express.static(path.join(__dirname, '../../dist')));
 
 app.use(authenticateToken); // Global auth middleware (populates req.user if token exists)
+
+// AI Routes (Protected?)
+app.use('/api/ai', aiRoutes);
 
 // Auth Routes
 app.post('/api/auth/register', async (req, res) => {

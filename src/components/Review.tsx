@@ -10,19 +10,32 @@ interface ReviewProps {
   onRetake: () => void;
 }
 
+const AI_STYLES = [
+  { id: 'cyberpunk', name: 'Cyberpunk' },
+  { id: 'anime', name: 'Anime' },
+  { id: 'oil-painting', name: 'Oil Painting' },
+  { id: 'retro', name: 'Retro' },
+  { id: 'pixar', name: '3D Character' },
+];
+
 export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
   const [selectedLayout, setSelectedLayout] = useState<LayoutType>('strip');
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('normal');
   const [frameColor, setFrameColor] = useState<string>('#ffffff');
   const [resultImage, setResultImage] = useState<string | null>(null);
+  const [baseResultImage, setBaseResultImage] = useState<string | null>(null); // Before AI
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCartoon, setIsCartoon] = useState(false);
 
+  // Server-side AI
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+
   // Decoration State
   const [activeStickers, setActiveStickers] = useState<StickerInstance[]>([]);
 
+  // 1. Base Processing (Stitch + Filters + Client-side Cartoon + Stickers)
   useEffect(() => {
     const processImage = async () => {
       setIsProcessing(true);
@@ -54,8 +67,9 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
             }
         }
 
+        setBaseResultImage(result);
         setResultImage(result);
-        setSavedUrl(null); // Reset saved URL when image changes
+        setSavedUrl(null);
       } catch (error) {
         console.error("Error stitching images:", error);
       } finally {
@@ -65,6 +79,30 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
 
     processImage();
   }, [photos, selectedLayout, selectedFilter, activeStickers, frameColor, isCartoon]);
+
+  const handleAiGenerate = async (style: string) => {
+      if (!baseResultImage) return;
+      setIsGeneratingAi(true);
+      try {
+          const response = await fetch('/api/ai/transform', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: baseResultImage, style })
+          });
+
+          if (response.ok) {
+              const data = await response.json();
+              setResultImage(data.image);
+          } else {
+              alert('AI Generation Failed');
+          }
+      } catch (e) {
+          console.error("AI Error", e);
+          alert('AI Generation Error');
+      } finally {
+          setIsGeneratingAi(false);
+      }
+  };
 
   const addSticker = (content: string, type: 'emoji' | 'image' = 'emoji') => {
       // Add random position near center
@@ -140,11 +178,19 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
 
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white p-4 overflow-y-auto">
-      <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh] gap-6">
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh] gap-6 relative">
         {isProcessing || !resultImage ? (
            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
         ) : (
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4 relative">
+              {isGeneratingAi && (
+                  <div className="absolute inset-0 bg-black/50 z-10 flex items-center justify-center rounded-sm">
+                      <div className="flex flex-col items-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mb-2"></div>
+                          <p className="text-white font-bold">Dreaming...</p>
+                      </div>
+                  </div>
+              )}
               <img
                 src={resultImage}
                 alt="Result"
@@ -218,16 +264,33 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
         {/* AI Features */}
         <div>
             <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-2">AI Magic</h3>
-            <button
-                onClick={() => setIsCartoon(!isCartoon)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors border ${
-                    isCartoon
-                    ? 'bg-purple-600 border-purple-500 text-white'
-                    : 'bg-transparent border-purple-500 text-purple-400 hover:bg-purple-900/30'
-                }`}
-            >
-                {isCartoon ? '✨ Cartoon On' : '✨ Apply Cartoon'}
-            </button>
+            <div className="flex flex-col gap-3">
+                {/* Client-side Toggle */}
+                <button
+                    onClick={() => setIsCartoon(!isCartoon)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors border w-fit ${
+                        isCartoon
+                        ? 'bg-purple-600 border-purple-500 text-white'
+                        : 'bg-transparent border-purple-500 text-purple-400 hover:bg-purple-900/30'
+                    }`}
+                >
+                    {isCartoon ? '✨ Client Cartoon (Instant)' : '✨ Client Cartoon'}
+                </button>
+
+                {/* Server-side Styles */}
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    {AI_STYLES.map((style) => (
+                        <button
+                            key={style.id}
+                            onClick={() => handleAiGenerate(style.id)}
+                            disabled={isGeneratingAi}
+                            className="px-4 py-2 rounded-lg font-medium bg-gradient-to-r from-pink-500 to-violet-600 text-white hover:opacity-90 disabled:opacity-50 whitespace-nowrap"
+                        >
+                            {isGeneratingAi ? 'Generating...' : `🤖 ${style.name}`}
+                        </button>
+                    ))}
+                </div>
+            </div>
         </div>
 
         {/* Stickers Selection */}
