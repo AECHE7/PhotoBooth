@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { type FilterType, filters } from '../utils/filters';
 import { type LayoutType, stitchImages } from '../utils/stitcher';
 import { QRCodeSVG } from 'qrcode.react';
-import { stickers, type StickerInstance, drawStickers } from '../utils/stickers';
+import { stickers, type StickerInstance, drawStickers, loadStickerImages } from '../utils/stickers';
+import { applyCartoonFilter } from '../utils/aiFilters';
 
 interface ReviewProps {
   photos: string[];
@@ -17,6 +18,7 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCartoon, setIsCartoon] = useState(false);
 
   // Decoration State
   const [activeStickers, setActiveStickers] = useState<StickerInstance[]>([]);
@@ -27,8 +29,8 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
       try {
         let result = await stitchImages(photos, selectedLayout, selectedFilter, frameColor);
 
-        // Apply stickers if any
-        if (activeStickers.length > 0) {
+        // Apply effects (Cartoon + Stickers)
+        if (activeStickers.length > 0 || isCartoon) {
             const canvas = document.createElement('canvas');
             const img = new Image();
             img.src = result;
@@ -38,7 +40,16 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 ctx.drawImage(img, 0, 0);
-                drawStickers(ctx, activeStickers);
+
+                if (isCartoon) {
+                    applyCartoonFilter(ctx, canvas.width, canvas.height);
+                }
+
+                if (activeStickers.length > 0) {
+                    const imageMap = await loadStickerImages(activeStickers);
+                    drawStickers(ctx, activeStickers, imageMap);
+                }
+
                 result = canvas.toDataURL('image/png');
             }
         }
@@ -53,18 +64,31 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
     };
 
     processImage();
-  }, [photos, selectedLayout, selectedFilter, activeStickers, frameColor]);
+  }, [photos, selectedLayout, selectedFilter, activeStickers, frameColor, isCartoon]);
 
-  const addSticker = (emoji: string) => {
+  const addSticker = (content: string, type: 'emoji' | 'image' = 'emoji') => {
       // Add random position near center
       const newSticker: StickerInstance = {
           id: Date.now(),
-          emoji,
-          x: 200 + Math.random() * 100, // Rough positioning, assumes roughly 500px wide image
+          type,
+          content,
+          x: 200 + Math.random() * 100,
           y: 300 + Math.random() * 100,
-          scale: 2.0
+          scale: type === 'image' ? 1.0 : 2.0
       };
       setActiveStickers([...activeStickers, newSticker]);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+              if (event.target?.result) {
+                  addSticker(event.target.result as string, 'image');
+              }
+          };
+          reader.readAsDataURL(e.target.files[0]);
+      }
   };
 
   const clearStickers = () => {
@@ -191,6 +215,21 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
           </div>
         </div>
 
+        {/* AI Features */}
+        <div>
+            <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-2">AI Magic</h3>
+            <button
+                onClick={() => setIsCartoon(!isCartoon)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors border ${
+                    isCartoon
+                    ? 'bg-purple-600 border-purple-500 text-white'
+                    : 'bg-transparent border-purple-500 text-purple-400 hover:bg-purple-900/30'
+                }`}
+            >
+                {isCartoon ? '✨ Cartoon On' : '✨ Apply Cartoon'}
+            </button>
+        </div>
+
         {/* Stickers Selection */}
         <div>
             <div className="flex justify-between items-center mb-2">
@@ -199,7 +238,7 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
                     <button onClick={clearStickers} className="text-xs text-red-400 hover:text-red-300">Clear</button>
                 )}
             </div>
-            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide items-center">
                 {stickers.map((emoji) => (
                     <button
                         key={emoji}
@@ -209,6 +248,12 @@ export const Review: React.FC<ReviewProps> = ({ photos, onRetake }) => {
                         {emoji}
                     </button>
                 ))}
+
+                {/* Upload Face */}
+                <label className="cursor-pointer text-sm bg-gray-800 px-3 py-2 rounded-lg hover:bg-gray-700 flex items-center gap-1 whitespace-nowrap">
+                    <span>📷 Add Face</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+                </label>
             </div>
         </div>
 
