@@ -9,7 +9,8 @@ import { PageTransition } from '../components/PageTransition';
 import { motion } from 'framer-motion';
 
 export function Booth() {
-  const { status, countdown, photos, videoRef, startSession, resetSession } = usePhotoBooth();
+  const [timerDuration, setTimerDuration] = useState(3);
+  const { status, countdown, photos, videoRef, startSession, resetSession } = usePhotoBooth({ countdownTime: timerDuration });
   const [currentFilter, setCurrentFilter] = useState<FilterType>('normal');
 
   return (
@@ -62,6 +63,24 @@ export function Booth() {
                             </motion.button>
                         ))}
                     </div>
+                </div>
+
+                {/* Timer Selection */}
+                <div className="flex items-center gap-2 bg-gray-800 p-2 rounded-full">
+                    <span className="text-xs text-gray-400 px-2 uppercase font-bold tracking-wider">Timer</span>
+                    {[3, 5, 10].map((t) => (
+                        <button
+                            key={t}
+                            onClick={() => setTimerDuration(t)}
+                            className={`w-10 h-10 rounded-full font-bold text-sm transition-all ${
+                                timerDuration === t
+                                ? 'bg-white text-black scale-110 shadow-lg'
+                                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                            }`}
+                        >
+                            {t}s
+                        </button>
+                    ))}
                 </div>
 
                 <div className="flex items-center gap-8">
